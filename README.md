@@ -28,7 +28,6 @@ app/
 examples/
   result.jpg
 
-.env.example
 .gitignore
 requirements.txt
 README.md
@@ -37,7 +36,7 @@ README.md
 
 Для запуска проекта локально в корне проекта должен быть файл .env.
 
-Пример заполнения находится в файле .env.example:
+Файл .env содержит параметры подключения к базе данных:
 
 DB_HOST=localhost
 DB_PORT=5432
@@ -45,7 +44,7 @@ DB_NAME=octagon_db
 DB_USER=octagon
 DB_PASSWORD=12345
 
-Файл .env не загружается в GitHub, потому что он предназначен для локальных настроек подключения.
+Файл .env не загружается в GitHub, потому что он находится в .gitignore.
 
 ## Установка зависимостей
 
