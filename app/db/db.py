@@ -1,54 +1,21 @@
 import os
-from pathlib import Path
-from collections.abc import Generator
-
 from dotenv import load_dotenv
 from sqlalchemy import create_engine
-from sqlalchemy.orm import Session, declarative_base, sessionmaker
+from sqlalchemy.orm import declarative_base, sessionmaker
 
+load_dotenv()
 
-ROOT_DIR = Path(__file__).resolve().parents[2]
-load_dotenv(ROOT_DIR / ".env")
+DB_HOST = os.getenv("DB_HOST")
+DB_PORT = os.getenv("DB_PORT")
+DB_NAME = os.getenv("DB_NAME")
+DB_USER = os.getenv("DB_USER")
+DB_PASSWORD = os.getenv("DB_PASSWORD")
 
+DATABASE_URL = (
+    f"postgresql+psycopg2://{DB_USER}:{DB_PASSWORD}"
+    f"@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+)
 
-def build_database_url() -> str:
-    db_user = os.getenv("DB_USER", "octagon")
-    db_password = os.getenv("DB_PASSWORD", "12345")
-    db_host = os.getenv("DB_HOST", "localhost")
-    db_port = os.getenv("DB_PORT", "5432")
-    db_name = os.getenv("DB_NAME", "octagon_db")
-
-    return (
-        f"postgresql+psycopg2://{db_user}:{db_password}"
-        f"@{db_host}:{db_port}/{db_name}"
-    )
-
-
+engine = create_engine(DATABASE_URL)
+SessionLocal = sessionmaker(bind=engine)
 Base = declarative_base()
-
-engine = create_engine(
-    build_database_url(),
-    echo=False,
-    future=True,
-)
-
-SessionLocal = sessionmaker(
-    bind=engine,
-    autoflush=False,
-    autocommit=False,
-    future=True,
-)
-
-
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-
-def create_tables() -> None:
-    from app.db import models
-
-    Base.metadata.create_all(bind=engine)
