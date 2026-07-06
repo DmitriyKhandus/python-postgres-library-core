@@ -1,234 +1,89 @@
-from decimal import Decimal
+from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from sqlalchemy import text
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.db.db import get_db
-from app.schemas import BookCreate, BookUpdate
+from app import schemas
+from app.dependencies import get_db
+from app.db import crud
+
+router = APIRouter(prefix="/books", tags=["books"])
 
 
-router = APIRouter(
-    prefix="/books",
-    tags=["books"],
-)
-
-
-def get_book_dict(db: Session, book_id: int):
-    query = text("""
-        SELECT
-            b.id,
-            b.title,
-            b.description,
-            b.price,
-            b.url,
-            b.category_id,
-            c.title AS category_title
-        FROM books b
-        LEFT JOIN categories c ON c.id = b.category_id
-        WHERE b.id = :book_id
-    """)
-
-    row = db.execute(query, {"book_id": book_id}).mappings().first()
-
-    if row is None:
-        return None
-
-    return {
-        "id": row["id"],
-        "title": row["title"],
-        "description": row["description"],
-        "price": str(row["price"]),
-        "url": row["url"],
-        "category_id": row["category_id"],
-        "category": {
-            "id": row["category_id"],
-            "title": row["category_title"],
-        },
-    }
-
-
-@router.get("/")
-def get_books(
-    category_id: int | None = Query(default=None),
-    db: Session = Depends(get_db),
+@router.get("/", response_model=list[schemas.BookRead])
+def read_books(
+    category_id: Optional[int] = None,
+    db: Session = Depends(get_db)
 ):
-    if category_id is not None:
-        category = db.execute(
-            text("SELECT id FROM categories WHERE id = :id"),
-            {"id": category_id},
-        ).first()
-
-        if category is None:
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="категория для фильтрации не найдена",
-            )
-
-        query = text("""
-            SELECT
-                b.id,
-                b.title,
-                b.description,
-                b.price,
-                b.url,
-                b.category_id,
-                c.title AS category_title
-            FROM books b
-            LEFT JOIN categories c ON c.id = b.category_id
-            WHERE b.category_id = :category_id
-            ORDER BY b.id
-        """)
-
-        rows = db.execute(query, {"category_id": category_id}).mappings().all()
-    else:
-        query = text("""
-            SELECT
-                b.id,
-                b.title,
-                b.description,
-                b.price,
-                b.url,
-                b.category_id,
-                c.title AS category_title
-            FROM books b
-            LEFT JOIN categories c ON c.id = b.category_id
-            ORDER BY b.id
-        """)
-
-        rows = db.execute(query).mappings().all()
-
-    return [
-        {
-            "id": row["id"],
-            "title": row["title"],
-            "description": row["description"],
-            "price": str(row["price"]),
-            "url": row["url"],
-            "category_id": row["category_id"],
-            "category": {
-                "id": row["category_id"],
-                "title": row["category_title"],
-            },
-        }
-        for row in rows
-    ]
+    return crud.get_books(db, category_id=category_id)
 
 
-@router.get("/{book_id}")
-def get_book(book_id: int, db: Session = Depends(get_db)):
-    book = get_book_dict(db, book_id)
+@router.get("/{book_id}", response_model=schemas.BookRead)
+def read_book(book_id: int, db: Session = Depends(get_db)):
+    book = crud.get_book_by_id(db, book_id)
 
     if book is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="книга не найдена",
-        )
+        raise HTTPException(status_code=404, detail="Book not found")
 
     return book
 
 
-@router.post("/", status_code=status.HTTP_201_CREATED)
-def create_book(book_data: BookCreate, db: Session = Depends(get_db)):
-    category = db.execute(
-        text("SELECT id FROM categories WHERE id = :id"),
-        {"id": book_data.category_id},
-    ).first()
+@router.post(
+    "/",
+    response_model=schemas.BookRead,
+    status_code=status.HTTP_201_CREATED
+)
+def create_book(book: schemas.BookCreate, db: Session = Depends(get_db)):
+    category = crud.get_category_by_id(db, book.category_id)
 
     if category is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="нельзя создать книгу: категория не найдена",
-        )
+        raise HTTPException(status_code=404, detail="Category not found")
 
-    query = text("""
-        INSERT INTO books (title, description, price, url, category_id)
-        VALUES (:title, :description, :price, :url, :category_id)
-        RETURNING id
-    """)
-
-    created_id = db.execute(
-        query,
-        {
-            "title": book_data.title,
-            "description": book_data.description,
-            "price": Decimal(book_data.price),
-            "url": book_data.url,
-            "category_id": book_data.category_id,
-        },
-    ).scalar_one()
-
-    db.commit()
-
-    return get_book_dict(db, created_id)
-
-
-@router.put("/{book_id}")
-def update_book(
-    book_id: int,
-    book_data: BookUpdate,
-    db: Session = Depends(get_db),
-):
-    book = db.execute(
-        text("SELECT id FROM books WHERE id = :id"),
-        {"id": book_id},
-    ).first()
-
-    if book is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="книга не найдена",
-        )
-
-    category = db.execute(
-        text("SELECT id FROM categories WHERE id = :id"),
-        {"id": book_data.category_id},
-    ).first()
-
-    if category is None:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="нельзя обновить книгу: категория не найдена",
-        )
-
-    db.execute(
-        text("""
-            UPDATE books
-            SET title = :title,
-                description = :description,
-                price = :price,
-                url = :url,
-                category_id = :category_id
-            WHERE id = :book_id
-        """),
-        {
-            "book_id": book_id,
-            "title": book_data.title,
-            "description": book_data.description,
-            "price": Decimal(book_data.price),
-            "url": book_data.url,
-            "category_id": book_data.category_id,
-        },
+    return crud.create_book(
+        db,
+        book.title,
+        book.description,
+        book.price,
+        book.url,
+        book.category_id
     )
 
-    db.commit()
 
-    return get_book_dict(db, book_id)
+@router.put("/{book_id}", response_model=schemas.BookRead)
+def update_book(
+    book_id: int,
+    book_data: schemas.BookUpdate,
+    db: Session = Depends(get_db)
+):
+    old_book = crud.get_book_by_id(db, book_id)
+
+    if old_book is None:
+        raise HTTPException(status_code=404, detail="Book not found")
+
+    if book_data.category_id is not None:
+        category = crud.get_category_by_id(db, book_data.category_id)
+
+        if category is None:
+            raise HTTPException(status_code=404, detail="Category not found")
+
+    updated_book = crud.update_book(
+        db,
+        book_id,
+        title=book_data.title,
+        description=book_data.description,
+        price=book_data.price,
+        url=book_data.url,
+        category_id=book_data.category_id
+    )
+
+    return updated_book
 
 
 @router.delete("/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_book(book_id: int, db: Session = Depends(get_db)):
-    result = db.execute(
-        text("DELETE FROM books WHERE id = :id"),
-        {"id": book_id},
-    )
+    deleted = crud.delete_book(db, book_id)
 
-    if result.rowcount == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="книга не найдена",
-        )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Book not found")
 
-    db.commit()
-
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return None
