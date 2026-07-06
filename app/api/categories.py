@@ -1,137 +1,59 @@
-from fastapi import APIRouter, Depends, HTTPException, Response, status
-from sqlalchemy import text
-from sqlalchemy.exc import IntegrityError
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-from app.db.db import get_db
-from app.schemas import CategoryCreate, CategoryUpdate
+from app import schemas
+from app.dependencies import get_db
+from app.db import crud
+
+router = APIRouter(prefix="/categories", tags=["categories"])
 
 
-router = APIRouter(
-    prefix="/categories",
-    tags=["categories"],
+@router.get("/", response_model=list[schemas.CategoryRead])
+def read_categories(db: Session = Depends(get_db)):
+    return crud.get_categories(db)
+
+
+@router.get("/{category_id}", response_model=schemas.CategoryRead)
+def read_category(category_id: int, db: Session = Depends(get_db)):
+    category = crud.get_category_by_id(db, category_id)
+
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
+
+    return category
+
+
+@router.post(
+    "/",
+    response_model=schemas.CategoryRead,
+    status_code=status.HTTP_201_CREATED
 )
-
-
-@router.get("/")
-def get_categories(db: Session = Depends(get_db)):
-    rows = db.execute(
-        text("SELECT id, title FROM categories ORDER BY id")
-    ).mappings().all()
-
-    return [
-        {
-            "id": row["id"],
-            "title": row["title"],
-        }
-        for row in rows
-    ]
-
-
-@router.get("/{category_id}")
-def get_category(category_id: int, db: Session = Depends(get_db)):
-    row = db.execute(
-        text("SELECT id, title FROM categories WHERE id = :id"),
-        {"id": category_id},
-    ).mappings().first()
-
-    if row is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="категория не найдена",
-        )
-
-    return {
-        "id": row["id"],
-        "title": row["title"],
-    }
-
-
-@router.post("/", status_code=status.HTTP_201_CREATED)
 def create_category(
-    category_data: CategoryCreate,
-    db: Session = Depends(get_db),
+    category: schemas.CategoryCreate,
+    db: Session = Depends(get_db)
 ):
-    try:
-        row = db.execute(
-            text("""
-                INSERT INTO categories (title)
-                VALUES (:title)
-                RETURNING id, title
-            """),
-            {"title": category_data.title},
-        ).mappings().first()
-
-        db.commit()
-
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="категория с таким названием уже существует",
-        )
-
-    return {
-        "id": row["id"],
-        "title": row["title"],
-    }
+    return crud.create_category(db, category.title)
 
 
-@router.put("/{category_id}")
+@router.put("/{category_id}", response_model=schemas.CategoryRead)
 def update_category(
     category_id: int,
-    category_data: CategoryUpdate,
-    db: Session = Depends(get_db),
+    category_data: schemas.CategoryUpdate,
+    db: Session = Depends(get_db)
 ):
-    try:
-        row = db.execute(
-            text("""
-                UPDATE categories
-                SET title = :title
-                WHERE id = :id
-                RETURNING id, title
-            """),
-            {
-                "id": category_id,
-                "title": category_data.title,
-            },
-        ).mappings().first()
+    category = crud.update_category(db, category_id, category_data.title)
 
-        if row is None:
-            db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_404_NOT_FOUND,
-                detail="категория не найдена",
-            )
+    if category is None:
+        raise HTTPException(status_code=404, detail="Category not found")
 
-        db.commit()
-
-    except IntegrityError:
-        db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="категория с таким названием уже существует",
-        )
-
-    return {
-        "id": row["id"],
-        "title": row["title"],
-    }
+    return category
 
 
 @router.delete("/{category_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_category(category_id: int, db: Session = Depends(get_db)):
-    result = db.execute(
-        text("DELETE FROM categories WHERE id = :id"),
-        {"id": category_id},
-    )
+    deleted = crud.delete_category(db, category_id)
 
-    if result.rowcount == 0:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="категория не найдена",
-        )
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Category not found")
 
-    db.commit()
-
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
+    return None
