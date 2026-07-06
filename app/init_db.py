@@ -1,100 +1,50 @@
-import sys
-from decimal import Decimal
-from pathlib import Path
+from app.db.db import Base, engine, SessionLocal
+from app.db.crud import create_category, create_book
 
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(PROJECT_ROOT))
+Base.metadata.drop_all(engine)
+Base.metadata.create_all(engine)
 
-from app.db.crud import (
-    change_book_price,
-    create_book,
-    create_category,
-    delete_book,
-    read_books,
-    read_categories,
-    rename_category,
-    reset_catalog,
+session = SessionLocal()
+
+programming = create_category(session, "Программирование")
+databases = create_category(session, "Базы данных")
+
+create_book(
+    session,
+    "Python для начинающих",
+    "Книга для изучения синтаксиса Python и базовых операторов.",
+    1200.0,
+    "",
+    programming.id
 )
-from app.db.db import SessionLocal, create_tables
 
+create_book(
+    session,
+    "Автоматизация на Python",
+    "Практическое пособие по автоматизации задач с помощью Python.",
+    1550.0,
+    "",
+    programming.id
+)
 
-def prepare_database() -> None:
-    create_tables()
+create_book(
+    session,
+    "Основы SQL",
+    "Книга о базовых запросах SQL и работе с таблицами.",
+    990.0,
+    "",
+    databases.id
+)
 
-    with SessionLocal() as session:
-        reset_catalog(session)
+create_book(
+    session,
+    "PostgreSQL на практике",
+    "Практическое руководство по работе с PostgreSQL.",
+    1800.0,
+    "",
+    databases.id
+)
 
-        backend = create_category(session, "backend-разработка")
-        databases = create_category(session, "базы данных")
-        practice = create_category(session, "практика программирования")
-        temporary = create_category(session, "временный раздел")
+session.close()
 
-        rename_category(
-            session,
-            current_title="временный раздел",
-            new_title="черновой раздел",
-        )
-
-        create_book(
-            session,
-            title="python для рабочего проекта",
-            description="Практическая книга о структуре Python-приложения.",
-            price=Decimal("790.00"),
-            url="https://example.com/python-project",
-            category_id=backend.id,
-        )
-
-        create_book(
-            session,
-            title="postgresql без лишней магии",
-            description="Короткое введение в таблицы, связи и SQL-запросы.",
-            price=Decimal("920.50"),
-            url="https://example.com/postgres-simple",
-            category_id=databases.id,
-        )
-
-        create_book(
-            session,
-            title="sqlalchemy в небольших приложениях",
-            description="Материал про модели, сессии и CRUD-операции.",
-            price=Decimal("1050.00"),
-            url="https://example.com/sqlalchemy-apps",
-            category_id=databases.id,
-        )
-
-        create_book(
-            session,
-            title="чистая структура учебного проекта",
-            description="Книга о том, как не превращать папки проекта в хаос.",
-            price=Decimal("610.00"),
-            url="https://example.com/project-structure",
-            category_id=practice.id,
-        )
-
-        create_book(
-            session,
-            title="запись для проверки удаления",
-            description="Эта книга нужна только для демонстрации delete.",
-            price=Decimal("100.00"),
-            url="https://example.com/remove",
-            category_id=temporary.id,
-        )
-
-        change_book_price(
-            session,
-            title="postgresql без лишней магии",
-            new_price=Decimal("970.00"),
-        )
-
-        delete_book(session, "запись для проверки удаления")
-
-        categories_count = len(read_categories(session))
-        books_count = len(read_books(session))
-
-    print("инициализация базы выполнена")
-    print(f"категорий в базе: {categories_count}")
-    print(f"книг в базе: {books_count}")
-
-
-if __name__ == "__main__":
-    prepare_database()
+print("База данных создана и заполнена категориями и книгами.")
