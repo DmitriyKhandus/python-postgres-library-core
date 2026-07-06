@@ -1,103 +1,161 @@
-# python-postgres-library-core
+# books api
 
-Учебный проект по работе с PostgreSQL и FastAPI.
+Учебный проект на Python с использованием FastAPI, PostgreSQL и SQLAlchemy.
 
-## Что реализовано
+Проект реализует API для работы с книгами и категориями книг.  
+Данные хранятся в базе данных PostgreSQL.
 
-В проекте настроено API для работы с каталогом книг.
+## что реализовано
 
-Реализованы:
-
-- подключение к PostgreSQL;
-- модели Category и Book через SQLAlchemy;
-- Pydantic-схемы для входных и выходных данных;
-- CRUD для категорий;
-- CRUD для книг;
+- подключение к PostgreSQL через SQLAlchemy;
+- модели `Book` и `Category`;
+- CRUD-операции для книг и категорий;
+- роутеры FastAPI для `books` и `categories`;
 - фильтрация книг по категории;
-- endpoint /health;
-- Swagger-документация FastAPI;
-- проверка данных в PostgreSQL.
+- endpoint `/health` для проверки работы приложения;
+- автоматическая документация FastAPI через `/docs`;
+- скриншоты результата работы в папке `examples/`.
 
-## Структура проекта
+## структура проекта
 
+```text
 app/
-  api/
-    categories.py
-    books.py
-  db/
-    db.py
-    models.py
-    crud.py
-  init_db.py
-  main.py
-  schemas.py
+├── api/
+│   ├── books.py
+│   └── categories.py
+├── db/
+│   ├── crud.py
+│   ├── db.py
+│   └── models.py
+├── dependencies.py
+├── init_db.py
+├── main.py
+└── schemas.py
 
 examples/
-  result.jpg
-  swagger-docs.jpg
-  api-request.jpg
-
-.gitignore
 requirements.txt
+.gitignore
 README.md
+```
 
-## Локальные настройки
+## подготовка базы данных
 
-Для запуска проекта локально в корне проекта должен быть файл .env.
+Проект использует PostgreSQL в WSL.
 
-Пример содержимого файла .env:
+Нужно создать пользователя PostgreSQL:
 
+```bash
+sudo -u postgres psql
+```
+
+Внутри PostgreSQL выполнить:
+
+```sql
+CREATE USER octagon WITH PASSWORD '12345';
+CREATE DATABASE octagon_db OWNER octagon;
+GRANT ALL PRIVILEGES ON DATABASE octagon_db TO octagon;
+```
+
+Выйти из PostgreSQL:
+
+```sql
+\q
+```
+
+## переменные окружения
+
+Для запуска проекта локально нужно создать файл `.env` в корне проекта.
+
+Пример содержимого:
+
+```env
 DB_HOST=localhost
 DB_PORT=5432
 DB_NAME=octagon_db
 DB_USER=octagon
 DB_PASSWORD=12345
+```
 
-Файл .env не загружается в GitHub, потому что он добавлен в .gitignore.
+Файл `.env` не загружается в GitHub, потому что содержит параметры подключения к базе данных.  
+Он добавлен в `.gitignore`.
 
-## Установка зависимостей
+## установка зависимостей
 
+Создать виртуальное окружение:
+
+```bash
 python3 -m venv venv
+```
+
+Активировать виртуальное окружение:
+
+```bash
 source venv/bin/activate
+```
+
+Установить зависимости:
+
+```bash
 pip install -r requirements.txt
+```
 
-## Подготовка базы
+## заполнение базы данных
 
-python3 app/init_db.py
+Перед запуском API нужно создать таблицы и заполнить базу начальными данными:
 
-## Запуск API
+```bash
+python3 -m app.init_db
+```
 
+После выполнения команды в базе появятся категории и книги.
+
+## запуск проекта
+
+Запустить сервер FastAPI:
+
+```bash
 uvicorn app.main:app --reload
+```
 
-После запуска доступны:
+После запуска приложение будет доступно по адресу:
 
-- http://127.0.0.1:8000/health
-- http://127.0.0.1:8000/docs
-- http://127.0.0.1:8000/categories/
-- http://127.0.0.1:8000/books/
+```text
+http://127.0.0.1:8000
+```
 
-## Примеры проверки
+## проверка работы
 
-Получить категории:
+Проверка состояния приложения:
 
+```text
+http://127.0.0.1:8000/health
+```
+
+Документация Swagger:
+
+```text
+http://127.0.0.1:8000/docs
+```
+
+В документации можно проверить endpoints:
+
+```text
 GET /categories/
-
-Получить книги:
+POST /categories/
+GET /categories/{category_id}
+PUT /categories/{category_id}
+DELETE /categories/{category_id}
 
 GET /books/
-
-Отфильтровать книги по категории:
-
-GET /books/?category_id=2
-
-Создать категорию:
-
-POST /categories/
-
-Создать книгу:
-
+GET /books/?category_id=1
 POST /books/
+GET /books/{book_id}
+PUT /books/{book_id}
+DELETE /books/{book_id}
+```
 
-## Скриншоты
+## результат
 
-Скриншоты результата работы API находятся в папке examples.
+Проект запускает FastAPI-сервер, подключается к PostgreSQL и позволяет работать с книгами и категориями через API.
+
+Скриншоты результата работы находятся в папке `examples/`.
