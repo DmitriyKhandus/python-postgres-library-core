@@ -1,132 +1,111 @@
-from decimal import Decimal
-
-from sqlalchemy import delete, select
-from sqlalchemy.orm import Session, selectinload
-
-from app.db.models import Book, Category
+from .models import Category, Book
 
 
-def reset_catalog(session: Session) -> None:
-    session.execute(delete(Book))
-    session.execute(delete(Category))
-    session.commit()
+# ---------- CRUD для категорий ----------
 
-
-def create_category(session: Session, title: str) -> Category:
-    category = session.scalar(
-        select(Category).where(Category.title == title)
-    )
-
-    if category is not None:
-        return category
-
+def create_category(session, title):
     category = Category(title=title)
     session.add(category)
     session.commit()
     session.refresh(category)
+    return category
+
+
+def get_categories(session):
+    return session.query(Category).all()
+
+
+def get_category_by_id(session, category_id):
+    return session.query(Category).filter(Category.id == category_id).first()
+
+
+def update_category(session, category_id, title):
+    category = get_category_by_id(session, category_id)
+
+    if category:
+        category.title = title
+        session.commit()
+        session.refresh(category)
 
     return category
 
 
-def read_categories(session: Session) -> list[Category]:
-    query = select(Category).order_by(Category.id)
-    return list(session.scalars(query))
+def delete_category(session, category_id):
+    category = get_category_by_id(session, category_id)
+
+    if category:
+        session.delete(category)
+        session.commit()
+        return True
+
+    return False
 
 
-def rename_category(
-    session: Session,
-    current_title: str,
-    new_title: str,
-) -> Category | None:
-    category = session.scalar(
-        select(Category).where(Category.title == current_title)
-    )
+# ---------- CRUD для книг ----------
 
-    if category is None:
-        return None
-
-    category.title = new_title
-    session.commit()
-    session.refresh(category)
-
-    return category
-
-
-def delete_category(session: Session, title: str) -> bool:
-    category = session.scalar(
-        select(Category).where(Category.title == title)
-    )
-
-    if category is None:
-        return False
-
-    session.delete(category)
-    session.commit()
-
-    return True
-
-
-def create_book(
-    session: Session,
-    title: str,
-    description: str,
-    price: Decimal,
-    url: str,
-    category_id: int,
-) -> Book:
+def create_book(session, title, description, price, url, category_id):
     book = Book(
         title=title,
         description=description,
         price=price,
         url=url,
-        category_id=category_id,
+        category_id=category_id
     )
 
     session.add(book)
     session.commit()
     session.refresh(book)
+    return book
+
+
+def get_books(session, category_id=None):
+    query = session.query(Book)
+
+    if category_id is not None:
+        query = query.filter(Book.category_id == category_id)
+
+    return query.all()
+
+
+def get_book_by_id(session, book_id):
+    return session.query(Book).filter(Book.id == book_id).first()
+
+
+def update_book(
+    session,
+    book_id,
+    title=None,
+    description=None,
+    price=None,
+    url=None,
+    category_id=None
+):
+    book = get_book_by_id(session, book_id)
+
+    if book:
+        if title is not None:
+            book.title = title
+        if description is not None:
+            book.description = description
+        if price is not None:
+            book.price = price
+        if url is not None:
+            book.url = url
+        if category_id is not None:
+            book.category_id = category_id
+
+        session.commit()
+        session.refresh(book)
 
     return book
 
 
-def read_books(session: Session) -> list[Book]:
-    query = (
-        select(Book)
-        .options(selectinload(Book.category))
-        .order_by(Book.id)
-    )
+def delete_book(session, book_id):
+    book = get_book_by_id(session, book_id)
 
-    return list(session.scalars(query))
+    if book:
+        session.delete(book)
+        session.commit()
+        return True
 
-
-def change_book_price(
-    session: Session,
-    title: str,
-    new_price: Decimal,
-) -> Book | None:
-    book = session.scalar(
-        select(Book).where(Book.title == title)
-    )
-
-    if book is None:
-        return None
-
-    book.price = new_price
-    session.commit()
-    session.refresh(book)
-
-    return book
-
-
-def delete_book(session: Session, title: str) -> bool:
-    book = session.scalar(
-        select(Book).where(Book.title == title)
-    )
-
-    if book is None:
-        return False
-
-    session.delete(book)
-    session.commit()
-
-    return True
+    return False
