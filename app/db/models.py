@@ -1,35 +1,25 @@
-from decimal import Decimal
-
-from sqlalchemy import ForeignKey, Numeric, String, Text
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-
-from app.db.db import Base
+from sqlalchemy import Column, Integer, String, Float, ForeignKey
+from sqlalchemy.orm import relationship
+from .db import Base
 
 
 class Category(Base):
     __tablename__ = "categories"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(String(120), unique=True, nullable=False)
+    id = Column(Integer, primary_key=True)
+    title = Column(String(100), nullable=False, unique=True)
 
-    books: Mapped[list["Book"]] = relationship(
-        back_populates="category",
-        cascade="all, delete-orphan",
-    )
+    books = relationship("Book", back_populates="category", cascade="all, delete")
 
 
 class Book(Base):
     __tablename__ = "books"
 
-    id: Mapped[int] = mapped_column(primary_key=True)
-    title: Mapped[str] = mapped_column(String(180), nullable=False)
-    description: Mapped[str] = mapped_column(Text, nullable=False)
-    price: Mapped[Decimal] = mapped_column(Numeric(10, 2), nullable=False)
-    url: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    id = Column(Integer, primary_key=True)
+    title = Column(String(200), nullable=False)
+    description = Column(String(500), nullable=False)
+    price = Column(Float, nullable=False)
+    url = Column(String(300), default="")
+    category_id = Column(Integer, ForeignKey("categories.id"))
 
-    category_id: Mapped[int] = mapped_column(
-        ForeignKey("categories.id", ondelete="CASCADE"),
-        nullable=False,
-    )
-
-    category: Mapped[Category] = relationship(back_populates="books")
+    category = relationship("Category", back_populates="books")
